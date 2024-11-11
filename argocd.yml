@@ -20,13 +20,12 @@
       command: microk8s kubectl get po,svc -n argocd
       register: argo_status
       changed_when: false
-
     - name: Display Argo CD installation status
       debug:
         var: argo_status.stdout
 
     - name: Retrieve Argo CD initial admin password
-      command: |
+      shell: |
         microk8s kubectl get secret -n argocd argocd-initial-admin-secret \
         -o jsonpath="{.data.password}" | base64 --decode
       register: argo_admin_password
@@ -49,4 +48,3 @@
     - name: Display Argo CD service configuration
       debug:
         var: argo_service_status.stdout
-
