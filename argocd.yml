@@ -1,0 +1,52 @@
+---
+- name: Install and Configure Argo CD on MicroK8s
+  hosts: gitops2
+  become: true
+
+  tasks:
+    - name: Create Argo CD namespace
+      command: microk8s kubectl create namespace argocd
+      changed_when: true
+
+    - name: Install Argo CD
+      command: microk8s kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/v2.13.0/manifests/install.yaml
+      changed_when: true
+
+    - name: Wait for Argo CD pods to initialize
+      pause:
+        seconds: 90
+
+    - name: Verify Argo CD installation
+      command: microk8s kubectl get po,svc -n argocd
+      register: argo_status
+      changed_when: false
+
+    - name: Display Argo CD installation status
+      debug:
+        var: argo_status.stdout
+
+    - name: Retrieve Argo CD initial admin password
+      command: |
+        microk8s kubectl get secret -n argocd argocd-initial-admin-secret \
+        -o jsonpath="{.data.password}" | base64 --decode
+      register: argo_admin_password
+      changed_when: false
+
+    - name: Display Argo CD initial admin password
+      debug:
+        var: argo_admin_password.stdout
+
+    - name: Change Argo CD server service to NodePort
+      shell: |
+        microk8s kubectl patch svc argocd-server -n argocd -p '{"spec": {"type": "NodePort"}}'
+      changed_when: true
+
+    - name: Verify Argo CD service configuration
+      command: microk8s kubectl get svc -n argocd
+      register: argo_service_status
+      changed_when: false
+
+    - name: Display Argo CD service configuration
+      debug:
+        var: argo_service_status.stdout
+

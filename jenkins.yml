@@ -1,0 +1,56 @@
+---
+- name: Setup Jenkins on GitOps1
+  hosts: gitops1
+  become: true
+
+  tasks:
+    - name: Create Docker volume for Jenkins
+      command: docker volume create jenkins-data
+      register: jenkins_volume
+      changed_when: false
+
+    - name: Ensure Docker network for Jenkins exists
+      docker_network:
+        name: jenkins-network
+        state: present
+
+    - name: Stop existing Jenkins container if it exists
+      shell: |
+        docker stop jenkins || true
+      ignore_errors: true
+
+    - name: Remove existing Jenkins container if it exists
+      shell: |
+        docker rm jenkins || true
+      ignore_errors: true
+
+    - name: Run Jenkins container
+      shell: |
+        docker run -d --name jenkins \
+          --network jenkins-network \
+          -p 8081:8080 -p 50000:50000 \
+          -v jenkins-data:/var/jenkins_home \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+          jenkins/jenkins:lts
+      args:
+        executable: /bin/bash
+
+    - name: Wait for Jenkins to initialize
+      pause:
+        seconds: 60
+
+    - name: Wait for Jenkins initial admin password file to be created
+      wait_for:
+        path: /var/lib/docker/volumes/jenkins-data/_data/secrets/initialAdminPassword
+        state: present
+        timeout: 300
+
+    - name: Get Jenkins initial admin password
+      shell: docker exec jenkins cat /var/jenkins_home/secrets/initialAdminPassword
+      register: jenkins_admin_password
+      changed_when: false
+
+    - name: Display Jenkins initial admin password
+      debug:
+        var: jenkins_admin_password.stdout
+
