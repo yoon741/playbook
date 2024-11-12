@@ -54,3 +54,30 @@
       debug:
         var: jenkins_admin_password.stdout
 
+    - name: Install Docker CLI inside Jenkins container
+      shell: |
+        docker exec -u root jenkins bash -c "
+          apt-get update &&
+          apt-get install -y apt-transport-https ca-certificates curl gnupg &&
+          mkdir -m 0755 -p /etc/apt/keyrings &&
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
+          gpg --dearmor -o /etc/apt/keyrings/docker.gpg &&
+          echo 'deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+          https://download.docker.com/linux/ubuntu jammy stable' > /etc/apt/sources.list.d/docker.list &&
+          apt-get update &&
+          apt-get install -y docker-ce-cli &&
+          groupadd docker || true &&
+          usermod -aG docker jenkins
+        "
+      args:
+        executable: /bin/bash
+
+    - name: Adjust permissions for Docker socket
+      file:
+        path: /var/run/docker.sock
+        mode: '0666'
+
+    - name: Restart Jenkins container
+      docker_container:
+        name: jenkins
+        state: restarted
