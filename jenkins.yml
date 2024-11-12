@@ -54,21 +54,40 @@
       debug:
         var: jenkins_admin_password.stdout
 
-    - name: Install Docker CLI inside Jenkins container
+    - name: Add Docker GPG key inside Jenkins container
       shell: |
         docker exec -u root jenkins bash -c "
-          apt-get update &&
-          apt-get install -y apt-transport-https ca-certificates curl gnupg &&
-          mkdir -m 0755 -p /etc/apt/keyrings &&
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | \
-          gpg --dearmor -o /etc/apt/keyrings/docker.gpg &&
-          echo 'deb [arch=\$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
-          https://download.docker.com/linux/ubuntu jammy stable' > /etc/apt/sources.list.d/docker.list &&
-          apt-get update &&
-          apt-get install -y docker-ce-cli &&
-          groupadd docker || true &&
-          usermod -aG docker jenkins
+          mkdir -p /etc/apt/keyrings &&
+          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --batch --yes --dearmor -o /etc/apt/keyrings/docker.gpg
         "
+      args:
+        executable: /bin/bash
+
+    - name: Add Docker repository inside Jenkins container
+      shell: |
+        docker exec -u root jenkins bash -c "
+          echo 'deb [arch=arm64 signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu jammy stable' > /etc/apt/sources.list.d/docker.list
+        "
+      args:
+        executable: /bin/bash
+
+    - name: Update apt cache inside Jenkins container
+      shell: docker exec -u root jenkins apt-get update
+      args:
+        executable: /bin/bash
+
+    - name: Install Docker CLI inside Jenkins container
+      shell: docker exec -u root jenkins apt-get install -y docker-ce-cli
+      args:
+        executable: /bin/bash
+
+    - name: Create docker group inside Jenkins container
+      shell: docker exec -u root jenkins groupadd docker || true
+      args:
+        executable: /bin/bash
+
+    - name: Add jenkins user to docker group
+      shell: docker exec -u root jenkins usermod -aG docker jenkins
       args:
         executable: /bin/bash
 
@@ -77,7 +96,12 @@
         path: /var/run/docker.sock
         mode: '0666'
 
-    - name: Restart Jenkins container
+    - name: Stop Jenkins container
       docker_container:
         name: jenkins
-        state: restarted
+        state: stopped
+
+    - name: Start Jenkins container
+      docker_container:
+        name: jenkins
+        state: started
