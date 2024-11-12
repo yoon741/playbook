@@ -1,10 +1,10 @@
 ---
 - name: Install and Configure MicroK8s
-  hosts: gitops2
+  hosts: gitops2, gitops3
   become: yes
 
   vars:
-    hostname: gitops2
+    hostname: gitops2, gitops3
     timezone: Asia/Seoul
     ip_address: 10.0.2.31/24
     gateway: 10.0.2.1
