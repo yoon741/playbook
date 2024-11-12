@@ -1,5 +1,5 @@
 ---
-- name: Setup Jenkins on GitOps1
+- name: Setup Jenkins on ARM architecture
   hosts: gitops1
   become: true
 
