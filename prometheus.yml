@@ -139,7 +139,7 @@
         name: node_exporter
         enabled: yes
         state: started
-        
+
     - name: Download and install nginx_prometheus_exporter
       shell: |
         wget https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v1.3.0/nginx-prometheus-exporter_1.3.0_linux_arm64.tar.gz -O /tmp/nginx_prometheus_exporter.tar.gz
