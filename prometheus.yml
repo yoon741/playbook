@@ -12,6 +12,12 @@
         state: present
         update_cache: yes
 
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        system: yes
+        shell: /bin/false
+
     - name: Create Prometheus directory
       file:
         path: /opt/prometheus
