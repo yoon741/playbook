@@ -1,0 +1,98 @@
+---
+- name: Configure and Run Node Exporter, cAdvisor, and Docker on gitops2
+  hosts: gitops2
+  become: true
+
+  tasks:
+    - name: Install required dependencies
+      apt:
+        name:
+          - wget
+          - tar
+        state: present
+        update_cache: yes
+
+    - name: Create Prometheus user
+      user:
+        name: prometheus
+        system: yes
+        shell: /bin/false
+
+    - name: Create directory for Node Exporter
+      file:
+        path: /opt/node_exporter
+        state: directory
+        owner: prometheus
+        group: prometheus
+        mode: '0755'
+
+    - name: Download and install Node Exporter
+      shell: |
+        wget https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-arm64.tar.gz -O /tmp/node_exporter.tar.gz
+        tar -xvf /tmp/node_exporter.tar.gz -C /opt/
+        mv /opt/node_exporter-1.8.2.linux-arm64/* /opt/node_exporter/
+      args:
+        creates: /opt/node_exporter/node_exporter
+
+    - name: Create Node Exporter systemd service
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Node Exporter
+          Wants=network-online.target
+          After=network-online.target
+
+          [Service]
+          User=prometheus
+          Group=prometheus
+          ExecStart=/opt/node_exporter/node_exporter \
+            --web.listen-address=0.0.0.0:9100
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start Node Exporter service
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: true
+        state: started
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Verify Docker installation
+      shell: docker --version
+      register: docker_version
+      changed_when: false
+
+    - name: Add user to Docker group
+      user:
+        name: "{{ ansible_user }}"
+        groups: docker
+        append: yes
+
+    - name: Pull and run cAdvisor container
+      docker_container:
+        name: cadvisor
+        image: "gcr.io/cadvisor/cadvisor:v0.49.1"
+        state: started
+        restart_policy: always
+        ports:
+          - "8080:8080"
+        volumes:
+          - "/:/rootfs:ro"
+          - "/var/run:/var/run:ro"
+          - "/sys:/sys:ro"
+          - "/var/lib/docker/:/var/lib/docker:ro"
+          - "/dev/disk/:/dev/disk:ro"
+
+    - name: Ensure Docker service is enabled
+      systemd:
+        name: docker
+        enabled: true
+        state: started
