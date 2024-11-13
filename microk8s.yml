@@ -4,107 +4,79 @@
   become: yes
 
   vars:
-    hostname: gitops2, gitops3
     timezone: Asia/Seoul
-    ip_address: 10.0.2.31/24
-    gateway: 10.0.2.1
-    dns_servers:
-      - 8.8.8.8
-      - 8.8.4.4
     user: ubuntu
 
   tasks:
     - name: Set hostname
-      hostname:                 # 호스트 모듈을 이용해서 호스트명 설정
-        name: "{{ hostname }}"  # 위에 선언되어있는 microk8s
+      hostname:
+        name: "{{ inventory_hostname }}"  # 인벤토리에서 각 호스트 이름을 사용하도록 설정
 
     - name: Disable swap
-      command: swapoff -a       # 가상메모리 비활성화
+      command: swapoff -a
       changed_when: false
 
     - name: Remove swap from fstab
-      replace:                  # 재부팅 시에도 가상메모리 비활성화
+      replace:
         path: /etc/fstab
         regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
         replace: '# \1'
 
     - name: Synchronize hardware clock
-      command: hwclock          # 로컬 시간을 시스템에 반영
+      command: hwclock
       changed_when: false
 
     - name: Disable UFW
-      ufw:                      # ufw 모듈을 이요해서 방화벽 비활성화
+      ufw:
         state: disabled
 
-          #    - name: Configure network
-          #      template:        # template 모듈을 이용해서 네트워크 설정 구성
-          #                       # 즉, jinja2 템플릿 형식을 이용해서 동적으로 설정파일 생성
-          #        src: 07netplan.j2  # 원본 템플릿 지정(소스파일)
-          #        dest: /etc/netplan/00-installer-config.yaml  # 템플릿에 내용을 복사할 파일 지정(반영할 파일의 경로)
-        # 바로위 소스파일을 이 형식으로 구성
-    #      notify: Apply netplan   # 해당 작업 완료 후 추가 작업을 위한 핸들러 호출
-
-    # sudo snap install microk8s --classic
     - name: Install MicroK8s
-      snap:             # snap 모듈을 이용해서 microk8s 설치
+      snap:
         name: microk8s
         classic: yes
 
-    # sudo usermod -a -G microk8s ubuntu
     - name: Add user to microk8s group
-      user:             # user 모듈을 이용해서 해당 사용자를(ubuntu 계정을) group(microk8s 그룹)으로 추가
+      user:
         name: "{{ user }}"
         groups: microk8s
         append: yes
 
-
     - name: Create .kube directory
-      file:             # file 모듈을 이용해서 디렉토리 생성 후 퍼미션 지정
+      file:
         path: "/home/{{ user }}/.kube"
         state: directory
         owner: "{{ user }}"
         group: "{{ user }}"
         mode: '0755'
 
-    # sudo chown -R ubuntu ~/.kube
     - name: Change ownership of .kube directory
-      file:             # file 모듈을 이용해서 소유자 변경
+      file:
         path: "/home/{{ user }}/.kube"
         owner: "{{ user }}"
         group: "{{ user }}"
-        recurse: yes    # 하위디렉토리들도 동일한 소유자로 변경 (-R 옵션과 동일)
+        recurse: yes
 
-    # export PATH=$PATH:/usr/snap/bin
-    # export PATH=$PATH:/snap/bin
     - name: Add PATH to .bashrc
-      lineinfile:       # lineinfile 모듈을 이용해서 두 문장을 PATH로 설정
+      lineinfile:
         path: "/home/{{ user }}/.bashrc"
         line: "{{ item }}"
       loop:
         - 'export PATH=$PATH:/usr/snap/bin'
         - 'export PATH=$PATH:/snap/bin'
 
-    # alias mk="microk8s kubectl"
-    # echo "alias mk='microk8s kubectl'" >> ~/.bashrc
-    # source ~/.bashrc
     - name: Add alias for microk8s kubectl
-      lineinfile:       # alias > 'microk8s kubectl'에 대한 별칭 추가
+      lineinfile:
         path: "/home/{{ user }}/.bashrc"
         line: "alias mk='microk8s kubectl'"
 
-
     - name: Get MicroK8s kubeconfig and save to ~/.kube/config
-      command: microk8s config      # 쿠버네티스 설정 가져오기
-      register: kubeconfig_output   # command에서 실행한 결과를 register에 저장
+      command: microk8s config
+      register: kubeconfig_output
 
     - name: Write kubeconfig to file
-      copy:             # 쿠버네티스 설정을 .kube/config에 저장
+      copy:
         content: "{{ kubeconfig_output.stdout }}"
         dest: /home/{{ user }}/.kube/config
         owner: "{{ user }}"
         group: "{{ user }}"
-        mode: '0600'  # 파일 권한 설정
-
-#  handlers:            # 네트워크 설정을 마무리하기 위한 핸들러 정의
-#    - name: Apply netplan
-#      command: netplan apply   # 상단에 있는 notepy netplan과 동일한 이름
+        mode: '0600'
