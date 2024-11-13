@@ -1,0 +1,35 @@
+---
+- name: Install and Configure Grafana on ARM
+  hosts: gitops1
+  become: yes
+
+  tasks:
+    - name: Install required packages
+      apt:
+        name:
+          - adduser
+          - libfontconfig1
+          - musl
+        state: present
+        update_cache: yes
+
+    - name: Download Grafana ARM64 package
+      get_url:
+        url: https://dl.grafana.com/enterprise/release/grafana-enterprise_11.3.0+security~01_arm64.deb
+        dest: /tmp/grafana-enterprise_11.3.0+security~01_arm64.deb
+
+    - name: Install Grafana package
+      apt:
+        deb: /tmp/grafana-enterprise_11.3.0+security~01_arm64.deb
+      register: grafana_install
+
+    - name: Reload systemd daemon
+      command: /bin/systemctl daemon-reload
+      when: grafana_install.changed
+
+    - name: Enable Grafana server service
+      systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+
