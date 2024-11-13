@@ -1,6 +1,6 @@
 ---
 - name: Install and Configure MicroK8s
-  hosts: gitops2
+  hosts: gitops2, gitops3
   become: yes
 
   vars:
